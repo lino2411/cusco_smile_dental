@@ -20,7 +20,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [tiempoRestante, setTiempoRestante] = useState(0);
-    const [formKey, setFormKey] = useState(Date.now()); // ✅ Key único para forzar re-render
+    const [formKey, setFormKey] = useState(Date.now()); // Key único para forzar re-render
     const navigate = useNavigate();
     const formRef = useRef(null);
 
@@ -37,23 +37,23 @@ export default function Login() {
         buttonsStyling: false,
     };
 
-    // ✅ EFFECT: Limpiar campos al montar componente
+    // EFFECT: Limpiar campos al montar componente
     useEffect(() => {
         const checkSessionAndCleanFields = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                console.log('✅ Sesión activa detectada, redirigiendo...');
+                console.log('Sesión activa detectada, redirigiendo...');
                 navigate('/dashboard', { replace: true });
             } else {
-                // ✅ FORZAR limpieza completa
-                console.log('🧹 Limpiando campos del login...');
+                // FORZAR limpieza completa
+                console.log('Limpiando campos del login...');
                 setDni('');
                 setPassword('');
                 setIsLocked(false);
                 setTiempoRestante(0);
                 setFormKey(Date.now()); // Cambiar key para forzar re-render
 
-                // ✅ Resetear el formulario HTML nativo
+                // Resetear el formulario HTML nativo
                 if (formRef.current) {
                     formRef.current.reset();
                 }
@@ -62,7 +62,7 @@ export default function Login() {
 
         checkSessionAndCleanFields();
 
-        // ✅ Limpieza al desmontar
+        // Limpieza al desmontar
         return () => {
             setDni('');
             setPassword('');
@@ -74,7 +74,7 @@ export default function Login() {
 
     const mostrarAlertaBloqueo = (minutos) => {
         Swal.fire({
-            title: '🔒 Acceso Bloqueado',
+            title: 'Acceso Bloqueado',
             html: `
                 <div class="text-center">
                     <p class="mb-3">Ha excedido el número de intentos permitidos.</p>
@@ -104,7 +104,7 @@ export default function Login() {
         const dniValue = String(dni || '').trim();
         if (!dniValue) {
             Swal.fire({
-                title: '⚠️ Campo Vacío',
+                title: 'Campo Vacío',
                 text: 'Por favor ingresa tu DNI',
                 icon: 'warning',
                 confirmButtonText: 'Entendido',
@@ -115,7 +115,7 @@ export default function Login() {
 
         if (!password) {
             Swal.fire({
-                title: '⚠️ Campo Vacío',
+                title: 'Campo Vacío',
                 text: 'Por favor ingresa tu contraseña',
                 icon: 'warning',
                 confirmButtonText: 'Entendido',
@@ -140,9 +140,9 @@ export default function Login() {
             const { data, error } = await supabase.rpc('get_user_by_dni', { d: dniValue });
 
             if (error) {
-                console.error('❌ Error RPC:', error);
+                console.error('Error RPC:', error);
                 Swal.fire({
-                    title: '❌ Error del Sistema',
+                    title: 'Error del Sistema',
                     text: 'Error al consultar usuario. Intente nuevamente.',
                     icon: 'error',
                     confirmButtonText: 'Entendido',
@@ -161,7 +161,7 @@ export default function Login() {
                     mostrarAlertaBloqueo(15);
                 } else {
                     Swal.fire({
-                        title: '⚠️ DNI No Registrado',
+                        title: 'DNI No Registrado',
                         html: `
                             <div class="text-center">
                                 <p class="mb-3">El DNI <strong>${dniValue}</strong> no está registrado.</p>
@@ -198,7 +198,7 @@ export default function Login() {
                     mostrarAlertaBloqueo(15);
                 } else {
                     Swal.fire({
-                        title: '❌ Contraseña Incorrecta',
+                        title: 'Contraseña Incorrecta',
                         html: `
                             <div class="text-center">
                                 <p class="mb-3">La contraseña ingresada es incorrecta.</p>
@@ -222,7 +222,7 @@ export default function Login() {
             await loginAttemptsService.resetearIntentos(dniValue);
             localStorage.setItem('rol', usuario.rol);
 
-            // ✅ Limpiar campos antes de mostrar alerta
+            // Limpiar campos antes de mostrar alerta
             setDni('');
             setPassword('');
             if (formRef.current) {
@@ -230,7 +230,7 @@ export default function Login() {
             }
 
             Swal.fire({
-                title: '✅ Bienvenido',
+                title: 'Bienvenido',
                 text: 'Acceso concedido.',
                 icon: 'success',
                 timer: 1500,
@@ -243,9 +243,9 @@ export default function Login() {
             }, 1500);
 
         } catch (err) {
-            console.error('❌ Error inesperado:', err);
+            console.error('Error inesperado:', err);
             Swal.fire({
-                title: '❌ Error Inesperado',
+                title: 'Error Inesperado',
                 text: 'Ocurrió un error. Intente nuevamente.',
                 icon: 'error',
                 confirmButtonText: 'Entendido',
@@ -294,7 +294,7 @@ export default function Login() {
                             </div>
                         )}
 
-                        {/* ✅ Form con key única y ref para forzar reset */}
+                        {/* Form con key única y ref para forzar reset */}
                         <form
                             key={formKey}
                             ref={formRef}

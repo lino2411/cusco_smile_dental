@@ -166,11 +166,11 @@ export default function Sidebar() {
                                     backgroundClip: 'text'
                                 }}
                             >
-                                {configuracion?.nombre_clinica || 'Cusco Smile'}
+                                {nombreClinica}
                             </h2>
                         </div>
                         <p className="text-xs text-gray-400 ml-1">
-                            {configuracion?.slogan || 'Atención Odontológica Especializada'}
+                            {configuracion?.slogan || descripcionClinica}
                         </p>
                     </div>
                 )}
@@ -276,7 +276,7 @@ export default function Sidebar() {
             {!isCollapsed && (
                 <div className="p-4 border-t border-gray-700/50 bg-gray-900/50">
                     <p className="text-xs text-center text-gray-500">
-                        © 2025 {configuracion?.nombre_clinica || 'Cusco Smile'}
+                        © 2026 {nombreClinica}
                     </p>
                 </div>
             )}
