@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { obtenerFechaPeruHoy, obtenerFechaHoraPeruISO } from '../utils/fechas';
+import { obtenerFechaPeruHoy } from '../utils/fechas';
 
 /**
  * Obtener todos los pagos con información del paciente (optimizado y corregido)
@@ -7,7 +7,7 @@ import { obtenerFechaPeruHoy, obtenerFechaHoraPeruISO } from '../utils/fechas';
 export async function obtenerTodosPagos() {
     const { data: pagos, error } = await supabase
         .from('pagos')
-        .select('id, paciente_id, fecha, tratamiento_realizado, costo, a_cuenta, saldo, metodo_pago, estado, observaciones, firma_id, usuario_registro, created_at') // ✅ AGREGADO firma_id
+        .select('id, paciente_id, fecha, tratamiento_realizado, costo, a_cuenta, saldo, metodo_pago, estado, observaciones, firma_id, usuario_registro, created_at')
         .order('fecha', { ascending: false });
 
     if (error) {
@@ -26,7 +26,6 @@ export async function obtenerTodosPagos() {
         return pagos.map(pago => ({ ...pago, pacientes: null }));
     }
 
-    // ✅ CORRECTO: Solo columnas que EXISTEN en la tabla pacientes
     const { data: pacientesData, error: errorPacientes } = await supabase
         .from('pacientes')
         .select('id, dni, nombres, apellidos, celular')
@@ -77,7 +76,7 @@ export async function obtenerPagosPorPaciente(pacienteId) {
                 dni,
                 celular
             )
-        `)  // ✅ AHORA SÍ INCLUYE firma_id EXPLÍCITAMENTE
+        `)
         .eq('paciente_id', pacienteId)
         .order('fecha', { ascending: false });
 
@@ -100,7 +99,6 @@ export async function obtenerPagoPorId(pagoId) {
         throw errorPago;
     }
 
-    // ✅ CORRECTO: Solo columnas que EXISTEN
     const { data: paciente } = await supabase
         .from('pacientes')
         .select('id, dni, nombres, apellidos, celular')
@@ -125,19 +123,24 @@ export async function obtenerPagoPorId(pagoId) {
  * Crear un nuevo pago
  */
 export async function crearPago(datosPago) {
+    // ✅ VALIDAR y CALCULAR correctamente
+    const costo = parseFloat(datosPago.costo) || 0;
+    const aCuenta = parseFloat(datosPago.a_cuenta) || 0;
+    const saldo = costo - aCuenta; // ✅ Calcular saldo
+
     const { data, error } = await supabase
         .from('pagos')
         .insert([{
             paciente_id: datosPago.paciente_id,
             fecha: datosPago.fecha,
             tratamiento_realizado: datosPago.tratamiento_realizado,
-            costo: datosPago.costo,
-            a_cuenta: datosPago.a_cuenta || 0,
-            saldo: datosPago.saldo || 0,
+            costo: costo,
+            a_cuenta: aCuenta,
+            saldo: saldo, // ✅ Usar saldo calculado
             metodo_pago: datosPago.metodo_pago,
-            estado: calcularEstado(datosPago.costo, datosPago.a_cuenta),
+            estado: calcularEstado(costo, aCuenta),
             observaciones: datosPago.observaciones || null,
-            firma_id: datosPago.firma_id || null, // ✅ NUEVO
+            firma_id: datosPago.firma_id || null,
             usuario_registro: datosPago.usuario_registro || null,
         }])
         .select()
@@ -149,10 +152,10 @@ export async function crearPago(datosPago) {
     }
 
     // Registrar historial si hay abono inicial
-    if (datosPago.a_cuenta > 0) {
+    if (aCuenta > 0) {
         await registrarHistorialPago({
             pago_id: data.id,
-            monto: datosPago.a_cuenta,
+            monto: aCuenta,
             metodo_pago: datosPago.metodo_pago,
             observaciones: 'Pago inicial',
         });
@@ -161,22 +164,26 @@ export async function crearPago(datosPago) {
     return data;
 }
 
-
 /**
  * Actualizar un pago
  */
 export async function actualizarPago(pagoId, datosActualizados) {
+    // ✅ VALIDAR y CALCULAR correctamente
+    const costo = parseFloat(datosActualizados.costo) || 0;
+    const aCuenta = parseFloat(datosActualizados.a_cuenta) || 0;
+    const saldo = costo - aCuenta; // ✅ Recalcular saldo
+
     const { data, error } = await supabase
         .from('pagos')
         .update({
             tratamiento_realizado: datosActualizados.tratamiento_realizado,
-            costo: datosActualizados.costo,
-            a_cuenta: datosActualizados.a_cuenta,
-            saldo: datosActualizados.saldo,
+            costo: costo,
+            a_cuenta: aCuenta,
+            saldo: saldo, // ✅ Actualizar saldo
             metodo_pago: datosActualizados.metodo_pago,
-            estado: calcularEstado(datosActualizados.costo, datosActualizados.a_cuenta),
+            estado: calcularEstado(costo, aCuenta),
             observaciones: datosActualizados.observaciones,
-            firma_id: datosActualizados.firma_id, // ✅ CORREGIDO: era firma_paciente
+            firma_id: datosActualizados.firma_id,
         })
         .eq('id', pagoId)
         .select()
@@ -194,7 +201,53 @@ export async function actualizarPago(pagoId, datosActualizados) {
  * Eliminar un pago
  */
 export async function eliminarPago(pagoId) {
-    // 1. Primero eliminar historial de pagos
+    // ✅ 0. PRIMERO: Obtener información del pago (para saber si tiene firma)
+    const { data: pagoInfo } = await supabase
+        .from('pagos')
+        .select('firma_id')
+        .eq('id', pagoId)
+        .single();
+
+    // ✅ 1. Eliminar firma asociada (si existe)
+    if (pagoInfo?.firma_id) {
+        try {
+            // Obtener URL de la firma para eliminar el archivo
+            const { data: firmaData } = await supabase
+                .from('firmas')
+                .select('firma_url')
+                .eq('id', pagoInfo.firma_id)
+                .single();
+
+            if (firmaData?.firma_url) {
+                // Extraer el path del storage desde la URL
+                const urlParts = firmaData.firma_url.split('/firmas/');
+                if (urlParts.length > 1) {
+                    const filePath = urlParts[1].split('?')[0]; // Remover query params
+
+                    // Eliminar archivo del storage
+                    await supabase.storage
+                        .from('firmas')
+                        .remove([filePath]);
+                }
+            }
+
+            // Eliminar registro de la tabla firmas
+            const { error: errorFirma } = await supabase
+                .from('firmas')
+                .delete()
+                .eq('id', pagoInfo.firma_id);
+
+            if (errorFirma) {
+                console.error('Error al eliminar firma:', errorFirma);
+                // No lanzamos error, continuamos con la eliminación del pago
+            }
+        } catch (errorFirma) {
+            console.error('Error procesando eliminación de firma:', errorFirma);
+            // Continuar con la eliminación del pago aunque falle la firma
+        }
+    }
+
+    // 2. Eliminar historial de pagos
     const { error: errorHistorial } = await supabase
         .from('historial_pagos')
         .delete()
@@ -205,7 +258,7 @@ export async function eliminarPago(pagoId) {
         throw errorHistorial;
     }
 
-    // 2. Eliminar movimiento en caja_movimientos (si existe)
+    // 3. Eliminar movimiento en caja_movimientos (si existe)
     const { error: errorCaja } = await supabase
         .from('caja_movimientos')
         .delete()
@@ -214,10 +267,9 @@ export async function eliminarPago(pagoId) {
 
     if (errorCaja) {
         console.error('Error al eliminar movimiento de caja:', errorCaja);
-        // No lanzamos error aquí por si no existe el movimiento
     }
 
-    // 3. Finalmente eliminar el pago
+    // 4. Finalmente eliminar el pago
     const { error } = await supabase
         .from('pagos')
         .delete()
@@ -240,15 +292,14 @@ export async function eliminarPago(pagoId) {
  */
 export async function registrarHistorialPago(datosHistorial) {
     const fechaFinal = datosHistorial.fecha || obtenerFechaPeruHoy();
-    //const fechaConHora = `${fechaFinal}T12:00:00-05:00`; // ✅ Con timezone de Perú
-    const fechaConHora = `${fechaFinal}T12:00:00-05:00`; // ✅ FORMATO ISO COMPLETO
+    const fechaConHora = `${fechaFinal}T12:00:00-05:00`;
 
     const { data, error } = await supabase
         .from('historial_pagos')
         .insert([{
             pago_id: datosHistorial.pago_id,
-            fecha: fechaConHora, // ✅ Con hora y timezone
-            monto: datosHistorial.monto,
+            fecha: fechaConHora,
+            monto: parseFloat(datosHistorial.monto) || 0, // ✅ Validar número
             metodo_pago: datosHistorial.metodo_pago,
             observaciones: datosHistorial.observaciones || null,
             recibo_numero: datosHistorial.recibo_numero || null,
@@ -282,7 +333,7 @@ async function actualizarMontoPagado(pagoId) {
         throw errorHistorial;
     }
 
-    const totalPagado = historial.reduce((sum, pago) => sum + parseFloat(pago.monto), 0);
+    const totalPagado = historial.reduce((sum, pago) => sum + parseFloat(pago.monto || 0), 0);
 
     // Obtener el costo total del pago
     const { data: pago, error: errorPago } = await supabase
@@ -296,14 +347,16 @@ async function actualizarMontoPagado(pagoId) {
         throw errorPago;
     }
 
-    const costoTotal = parseFloat(pago.costo);
+    const costoTotal = parseFloat(pago.costo || 0);
+    const nuevoSaldo = costoTotal - totalPagado; // ✅ CALCULAR saldo
     const nuevoEstado = calcularEstado(costoTotal, totalPagado);
 
-    // Actualizar el pago con el nuevo monto pagado y estado
+    // ✅ ACTUALIZAR a_cuenta, saldo Y estado
     const { error: errorUpdate } = await supabase
         .from('pagos')
         .update({
             a_cuenta: totalPagado,
+            saldo: nuevoSaldo, // ✅ AGREGAR actualización de saldo
             estado: nuevoEstado,
         })
         .eq('id', pagoId);
@@ -364,7 +417,7 @@ export async function obtenerMetodosPago() {
         .from('metodos_pago')
         .select('*')
         .eq('activo', true)
-        .order('nombre', { ascending: true });
+        .order('orden', { ascending: true });
 
     if (error) {
         console.error('Error al obtener métodos de pago:', error);
@@ -409,8 +462,10 @@ export async function obtenerEstadisticasPagos() {
 
     const totalIngresos = data.reduce((sum, pago) => sum + parseFloat(pago.a_cuenta || 0), 0);
     const totalPendiente = data.reduce((sum, pago) => {
-        const debe = parseFloat(pago.costo) - parseFloat(pago.a_cuenta || 0);
-        return sum + debe;
+        const costo = parseFloat(pago.costo || 0);
+        const aCuenta = parseFloat(pago.a_cuenta || 0);
+        const debe = costo - aCuenta;
+        return sum + (debe > 0 ? debe : 0); // ✅ Solo sumar si hay deuda
     }, 0);
 
     const pagosPorEstado = {
@@ -427,19 +482,18 @@ export async function obtenerEstadisticasPagos() {
     };
 }
 
-// src/services/pagosService.js
-
+/**
+ * Verificar si un paciente tiene pago inicial de ortodoncia
+ */
 export async function pacienteTienePagoInicialOrtodoncia(pacienteId) {
-    // Si no hay ID de paciente, no se puede realizar la consulta.
     if (!pacienteId) {
         return false;
     }
 
-    // Lista de tratamientos de ortodoncia (ajusta según tus nombres exactos)
     const tratamientosOrto = [
-        'Ortodoncia (Cuota inicial)',
-        'Ortodoncia interceptiva (cuota inicial)',
-        // Puedes añadir variantes...
+        'ortodoncia (cuota inicial)',
+        'ortodoncia interceptiva (cuota inicial)',
+        'ortodoncia',
     ];
 
     const { data, error } = await supabase
@@ -452,11 +506,11 @@ export async function pacienteTienePagoInicialOrtodoncia(pacienteId) {
         return false;
     }
 
-    return (data || []).some(pago =>
-        pago.tratamiento_realizado &&
-        tratamientosOrto.some(orto =>
-            pago.tratamiento_realizado.toLowerCase().includes(orto.toLowerCase())
-        )
-    );
-}
+    // ✅ Búsqueda case-insensitive más robusta
+    return (data || []).some(pago => {
+        if (!pago.tratamiento_realizado) return false;
 
+        const tratamientoLower = pago.tratamiento_realizado.toLowerCase().trim();
+        return tratamientosOrto.some(orto => tratamientoLower.includes(orto.toLowerCase()));
+    });
+}

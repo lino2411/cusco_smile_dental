@@ -148,6 +148,11 @@ export default function SignaturePad({
             setFirmaGuardada(null);
             setFirmando(true);
 
+            // ✅ NOTIFICAR al padre que se eliminó la firma
+            if (onFirmaGuardada) {
+                onFirmaGuardada(null);
+            }
+
             Swal.fire({
                 title: 'Eliminada',
                 text: 'La firma ha sido eliminada',

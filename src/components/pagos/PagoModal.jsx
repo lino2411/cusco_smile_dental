@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Plus, DollarSign, CreditCard, Calendar, FileText, Trash2, Receipt, Search } from 'lucide-react';
+import { X, Save, Plus, DollarSign, CreditCard, Calendar, FileText, Trash2, Receipt, Search, Signature, CheckCheck, ClipboardPen } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { supabase } from '../../services/supabaseClient';
 import {
@@ -10,7 +10,6 @@ import {
     eliminarHistorialPago,
     obtenerMetodosPago,
 } from '../../services/pagosService';
-import { TRATAMIENTOS } from '../../data/tratamientos';
 import SelectorTratamiento from './SelectorTratamiento';
 import { pacienteTienePagoInicialOrtodoncia } from '../../services/pagosService';
 import { registrarMovimientoCaja } from '../../services/cajaService';
@@ -34,7 +33,7 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
     const [pacienteId, setPacienteId] = useState(pago?.paciente_id || '');
     const [fecha, setFecha] = useState(pago?.fecha || obtenerFechaPeruHoy());
 
-    // ✅ AGREGAR ESTAS LÍNEAS QUE FALTAN:
+    // AGREGAR ESTAS LÍNEAS QUE FALTAN:
     const [tratamiento, setTratamiento] = useState(pago?.tratamiento_realizado || '');
     const [costo, setCosto] = useState(pago?.costo || '');
     const [aCuenta, setACuenta] = useState(pago?.a_cuenta || '');
@@ -60,7 +59,16 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
         cargarDatos();
     }, [pago]);
 
-    // useEffect #2: Cerrar dropdown al hacer clic fuera
+    //  useEffect #2: Cargar firma existente en modo edición
+    useEffect(() => {
+        if (pago?.id && pago?.firma_id) {
+            // Si el pago tiene firma_id, significa que tiene firma
+            // El SignaturePad ya la cargará automáticamente
+            setFirmaGuardada({ id: pago.firma_id });
+        }
+    }, [pago]);
+
+    // useEffect #3: Cerrar dropdown al hacer clic fuera
     useEffect(() => {
         const handleClickOutside = (event) => {
             const dropdown = event.target.closest('.relative');
@@ -132,13 +140,24 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
 
         setLoading(true);
         try {
-            // ✅ OBTENER USUARIO
+            // OBTENER USUARIO
             const { data: { session } } = await supabase.auth.getSession();
             const { data: usuarioData } = await supabase
                 .from('usuarios')
                 .select('id')
                 .eq('auth_user_id', session.user.id)
                 .single();
+
+            // ✅ DETERMINAR firma_id correctamente según el modo
+            let firmaIdFinal = null;
+
+            if (pago?.id) {
+                // MODO EDICIÓN: Preservar firma existente
+                firmaIdFinal = firmaGuardada?.id || pago.firma_id || null;
+            } else {
+                // MODO CREAR: Solo si se dibujó nueva firma
+                firmaIdFinal = firmaDibujada ? null : null; // Se asignará después
+            }
 
             const datosPago = {
                 paciente_id: pacienteId,
@@ -150,13 +169,13 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
                 metodo_pago: metodoPago,
                 observaciones,
                 usuario_registro: usuarioData?.id,
-                firma_id: null, // Se actualizará después si hay firma
+                firma_id: firmaIdFinal, // USAR firma_id calculado
             };
 
             let pagoGuardado;
 
             if (pago?.id) {
-                // ✅ MODO EDICIÓN
+                // MODO EDICIÓN
                 await actualizarPago(pago.id, datosPago);
                 pagoGuardado = { id: pago.id };
 
@@ -170,7 +189,7 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
                     showConfirmButton: false,
                 });
             } else {
-                // ✅ MODO CREAR
+                // MODO CREAR
                 pagoGuardado = await crearPago(datosPago);
 
                 if (firmaDibujada) {
@@ -233,7 +252,7 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
         }
     };
 
-    // ✅ COMPONENTE DE FIRMA SIMPLE - VERSIÓN CORREGIDA
+    // COMPONENTE DE FIRMA SIMPLE - VERSIÓN CORREGIDA
     const FirmaPadSimple = () => {
         const sigCanvas = useRef(null);
         const [firmaTemporal, setFirmaTemporal] = useState(null);
@@ -276,10 +295,10 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
             <div className="border-2 border-dashed border-smile_300 rounded-lg p-4 bg-smile_50/30">
                 <div className="flex items-center justify-between mb-3">
                     <span className="font-semibold text-gray-700 flex items-center gap-2">
-                        ✍️ Firma del Paciente
+                        <Signature className='w-6 h-6' /> Firma del Paciente
                         {firmaTemporal && (
                             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                                ✓ Guardada
+                                <CheckCheck className='w-5 h-5' /> Guardada
                             </span>
                         )}
                     </span>
@@ -287,16 +306,16 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
                         <button
                             type="button"
                             onClick={guardarFirma}
-                            className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
                         >
-                            💾 Guardar
+                            <Save className='w-5 h-5' /> Guardar
                         </button>
                         <button
                             type="button"
                             onClick={limpiar}
-                            className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
                         >
-                            🗑️ Borrar
+                            <Trash2 className='w-5 h-5' /> Borrar
                         </button>
                     </div>
                 </div>
@@ -316,7 +335,7 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
                     />
                 </div>
                 <p className="text-xs text-gray-500 mt-2 text-center">
-                    💡 Dibuja la firma y haz clic en "💾 Guardar" antes de guardar el pago.
+                    <ClipboardPen className='w-4 h-4 inline mr-1' /> Dibuja la firma y haz clic en "<Save className='w-4 h-4 inline' /> Guardar" antes de guardar el pago.
                 </p>
             </div>
         );
@@ -508,13 +527,13 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Paciente *
                                     </label>
-                                    {/* ✅ MODO EDICIÓN: Paciente bloqueado */}
+                                    {/* MODO EDICIÓN: Paciente bloqueado */}
                                     {pago?.id ? (
                                         <div className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-medium">
                                             {pacientes.find(p => p.id === pacienteId)?.nombres} {pacientes.find(p => p.id === pacienteId)?.apellidos} - DNI: {pacientes.find(p => p.id === pacienteId)?.dni}
                                         </div>
                                     ) : (
-                                        /* ✅ MODO NUEVO: Dropdown con paciente preseleccionado si existe */
+                                        /*MODO NUEVO: Dropdown con paciente preseleccionado si existe */
                                         <div className="relative">
                                             <div
                                                 onClick={() => setMostrarDropdown(!mostrarDropdown)}
@@ -609,7 +628,6 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
                                     <SelectorTratamiento
                                         value={tratamiento}
                                         onChange={handleSeleccionTratamiento}
-                                        tratamientos={TRATAMIENTOS}
                                     />
                                 </div>
 
@@ -896,15 +914,15 @@ export default function PagoModal({ pago = null, onClose, onPagoGuardado = () =>
                     </form>
                 </div>
 
-                {/* Footer - ✅ BOTONES CORREGIDOS */}
+                {/* Footer - BOTONES CORREGIDOS */}
                 <div className="bg-gray-50 border-t border-gray-100 px-8 py-4 flex justify-end gap-3">
                     <button
                         onClick={onClose}
                         disabled={loading}
                         type="button"
-                        className="px-6 py-2.5 text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg transition-colors font-medium disabled:opacity-50"
+                        className="flex items-center gap-2 px-6 py-2.5 text-white bg-red-500 hover:bg-red-700 border border-gray-300 rounded-lg transition-colors font-medium disabled:opacity-50"
                     >
-                        Cancelar
+                        <X className='w-5 h-5' />Cancelar
                     </button>
                     <button
                         onClick={handleSubmit}

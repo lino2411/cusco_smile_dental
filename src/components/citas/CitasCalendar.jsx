@@ -35,7 +35,7 @@ const HORARIO_CLINICA = {
     inicio: '09:00',
     fin: '21:00',
     bloqueos: [
-        // { inicio: '13:00', fin: '15:00', motivo: 'Almuerzo' }, // ✅ COMENTADO: Ya no bloquea almuerzo
+        // { inicio: '13:00', fin: '15:00', motivo: 'Almuerzo' }, // COMENTADO: Ya no bloquea almuerzo
     ]
 };
 

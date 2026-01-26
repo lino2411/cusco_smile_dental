@@ -310,7 +310,7 @@ export default function Login() {
                                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                         <FaIdCard className="h-5 w-5 text-smile_300" />
                                     </div>
-                                    {/* ✅ Input con múltiples técnicas anti-autocompletado */}
+                                    {/* Input con múltiples técnicas anti-autocompletado */}
                                     <input
                                         id="dni"
                                         name={`dni-${formKey}`}

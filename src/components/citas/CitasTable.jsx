@@ -62,7 +62,7 @@ function AccionesMenu({
             }
         };
 
-        // ✅ SOLUCIÓN: Solo cerrar si el scroll NO es dentro del dropdown
+        // SOLUCIÓN: Solo cerrar si el scroll NO es dentro del dropdown
         const handleScroll = (event) => {
             if (open && dropdownRef.current) {
                 // No cerrar si el scroll es dentro del dropdown
@@ -106,12 +106,12 @@ function AccionesMenu({
                         position: 'absolute',
                         zIndex: 9999,
                         transform: openUpwards ? 'translateY(-100%)' : 'none',
-                        maxHeight: '400px', // ✅ NUEVO: Altura máxima
-                        overflowY: 'auto'   // ✅ NUEVO: Scroll interno
+                        maxHeight: '400px', // NUEVO: Altura máxima
+                        overflowY: 'auto'   // NUEVO: Scroll interno
                     }}
                     className={`w-48 bg-white rounded-lg shadow-xl ring-1 ring-black/5 border border-gray-100 animate-in fade-in zoom-in-95 duration-100 ${openUpwards ? 'origin-bottom-right' : 'origin-top-right'}`}
                 >
-                    {/* ✅ NUEVO: Contenedor con padding para el scroll */}
+                    {/* NUEVO: Contenedor con padding para el scroll */}
                     <div className="py-1">
 
                         {/* SECCIÓN: VER INFORMACIÓN */}
@@ -264,7 +264,7 @@ export default function CitasTable({
         navigate(`/dashboard/pacientes?pacienteId=${idPaciente}&tab=historias`);
     };
 
-    // ✅ ÚNICA MEJORA: Estado para búsqueda
+    // ÚNICA MEJORA: Estado para búsqueda
     const [busqueda, setBusqueda] = useState('');
 
     // --- PAGINACIÓN ---
@@ -275,7 +275,7 @@ export default function CitasTable({
         setPaginaActual(1);
     }, [citas, busqueda]);
 
-    // ✅ Filtrar citas (sin ordenamiento, mantiene orden original)
+    // Filtrar citas (sin ordenamiento, mantiene orden original)
     const citasFiltradas = citas.filter(c => {
         const termino = busqueda.toLowerCase();
         const nombrePaciente = (c.nombre_paciente || '').toLowerCase();
@@ -313,7 +313,7 @@ export default function CitasTable({
 
     return (
         <>
-            {/* ✅ BARRA DE BÚSQUEDA */}
+            {/* BARRA DE BÚSQUEDA */}
             <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -358,9 +358,9 @@ export default function CitasTable({
                                 <tr key={cita.id} className="hover:bg-smile_50 transition-colors border-b last:border-b-0">
                                     <td className="py-3 px-4 font-medium">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-gray-100 rounded-full">
+                                            {/* <div className="p-2 bg-gray-100 rounded-full">
                                                 <User className="w-5 h-5 text-gray-600" />
-                                            </div>
+                                            </div> */}
                                             <div>
                                                 <div className="font-bold text-gray-900">{cita.nombre_paciente}</div>
                                                 <div className="text-xs text-gray-500 font-normal">
@@ -394,7 +394,7 @@ export default function CitasTable({
                                             {formatEstado(cita.estado)}
                                         </span>
                                     </td>
-                                    <td className="py-3 px-4 text-center">
+                                    <td className="py-3 px-4 text-center flex items-center justify-center">
                                         <AccionesMenu
                                             cita={cita}
                                             index={index}

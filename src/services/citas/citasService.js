@@ -77,7 +77,7 @@ export async function editarCita(id, cita, usuarioId) {
 }
 
 // ========================================================
-// OBTENER TODAS LAS CITAS CON FILTROS AVANZADOS
+// OBTENER TODAS LAS CITAS CON ORDENAMIENTO INTELIGENTE
 // ========================================================
 export async function obtenerCitas({
     fecha_inicio,
@@ -92,9 +92,7 @@ export async function obtenerCitas({
             *,
             pacientes(*),
             usuarios!dentista_id(*)
-        `)
-        .order('fecha', { ascending: false })
-        .order('hora_inicio', { ascending: true });
+        `);
 
     if (fecha_inicio) {
         query = query.gte('fecha', `${fecha_inicio}T00:00:00-05:00`);
@@ -114,7 +112,61 @@ export async function obtenerCitas({
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    return data || [];
+
+    // ORDENAMIENTO INTELIGENTE EN JAVASCRIPT
+    const fechaHoy = obtenerFechaPeruHoy();
+
+    const citasOrdenadas = (data || []).sort((a, b) => {
+        // 1. Calcular prioridad de cada cita
+        const prioridadA = calcularPrioridad(a, fechaHoy);
+        const prioridadB = calcularPrioridad(b, fechaHoy);
+
+        // 2. Ordenar por prioridad (menor número = mayor prioridad)
+        if (prioridadA !== prioridadB) {
+            return prioridadA - prioridadB;
+        }
+
+        // 3. Dentro de la misma prioridad, ordenar por fecha
+        const fechaCompare = a.fecha.localeCompare(b.fecha);
+        if (fechaCompare !== 0) {
+            return fechaCompare;
+        }
+
+        // 4. Dentro de la misma fecha, ordenar por hora
+        return a.hora_inicio.localeCompare(b.hora_inicio);
+    });
+
+    return citasOrdenadas;
+}
+
+// ========================================================
+// FUNCIÓN AUXILIAR: CALCULAR PRIORIDAD DE CITA
+// ========================================================
+function calcularPrioridad(cita, fechaHoy) {
+    const esHoy = cita.fecha === fechaHoy;
+    const esFutura = cita.fecha > fechaHoy;
+    const esPasada = cita.fecha < fechaHoy;
+
+    // Estados activos (pendiente, confirmada, en_consulta)
+    const estadosActivos = ['pendiente', 'confirmada', 'en_consulta'];
+    const esActiva = estadosActivos.includes(cita.estado);
+
+    // Estados finalizados (atendida, cancelada, reprogramada)
+    const esCompletada = cita.estado === 'atendida';
+    const esCancelada = cita.estado === 'cancelada';
+
+    // ORDEN DE PRIORIDAD:
+    // 1 = Citas de HOY activas (pendiente, confirmada, en_consulta)
+    // 2 = Citas de HOY completadas/canceladas
+    // 3 = Citas FUTURAS (todas, ordenadas por fecha)
+    // 4 = Citas PASADAS (todas, ordenadas por fecha desc)
+
+    if (esHoy && esActiva) return 1;
+    if (esHoy && (esCompletada || esCancelada)) return 2;
+    if (esFutura) return 3;
+    if (esPasada) return 4;
+
+    return 5; // Fallback (no debería llegar aquí)
 }
 
 // ========================================================
